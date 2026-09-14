@@ -1,0 +1,381 @@
+2D 데이터 정형화 점묘화 ver
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D 이미지를 점묘화 및 VR 데이터로 변환하기</title>
+    <style>
+        :root {
+            --bg-color: #0f1117;
+            --card-bg: #1a1d24;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --text-color: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #2e3440;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #a5b4fc, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 850px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-color);
+        }
+
+        .file-upload {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+
+        .file-upload:hover {
+            border-color: var(--accent);
+            background-color: rgba(99, 102, 241, 0.05);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent);
+        }
+
+        .val-badge {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            min-width: 36px;
+            text-align: right;
+        }
+
+        button {
+            width: 100%;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 8px;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:disabled {
+            background-color: #334155;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            min-height: 480px;
+            background-color: #050508;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        canvas {
+            max-width: 100%;
+            max-height: 70vh;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 4px;
+        }
+
+        .export-btns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        .placeholder-text {
+            color: var(--text-muted);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🎨 2D Image to Pointillism VR Data Generator</h1>
+        <p class="subtitle">JPG/PNG 그림을 업로드하여 점묘화 스타일로 변환하고 VR용 3D 파티클 데이터를 추출하세요.</p>
+    </header>
+
+    <div class="main-layout">
+        <div class="panel">
+            <div class="control-group">
+                <label>이미지 업로드 (JPG / PNG)</label>
+                <div class="file-upload" onclick="document.getElementById('imgInput').click()">
+                    <span id="uploadLabel">📁 이미지 선택하기</span>
+                    <input type="file" id="imgInput" accept="image/png, image/jpeg, image/jpg">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>점 간격 / 촘촘함 (Grid Size)</label>
+                <div class="slider-container">
+                    <input type="range" id="gridSize" min="4" max="20" value="8">
+                    <span class="val-badge" id="gridVal">8px</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>붓터치 불규칙성 (Jitter)</label>
+                <div class="slider-container">
+                    <input type="range" id="jitter" min="0" max="100" value="70">
+                    <span class="val-badge" id="jitterVal">0.7</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>점 크기 (Base Radius)</label>
+                <div class="slider-container">
+                    <input type="range" id="radius" min="1" max="10" value="4" step="0.5">
+                    <span class="val-badge" id="radiusVal">4.0</span>
+                </div>
+            </div>
+
+            <button id="convertBtn" disabled>점묘화 변환 실행</button>
+
+            <div class="export-btns">
+                <button id="exportJson" class="btn-secondary" disabled>JSON 저장</button>
+                <button id="exportCsv" class="btn-secondary" disabled>CSV 저장</button>
+            </div>
+        </div>
+
+        <div class="panel canvas-container" id="canvasBox">
+            <div class="placeholder-text" id="placeholder">
+                이미지를 업로드한 후<br><b>'점묘화 변환 실행'</b> 버튼을 눌러주세요.
+            </div>
+            <canvas id="outputCanvas" style="display:none;"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    let loadedImage = null;
+    let pointDataList = [];
+
+    const imgInput = document.getElementById('imgInput');
+    const uploadLabel = document.getElementById('uploadLabel');
+    const convertBtn = document.getElementById('convertBtn');
+    const exportJson = document.getElementById('exportJson');
+    const exportCsv = document.getElementById('exportCsv');
+    const outputCanvas = document.getElementById('outputCanvas');
+    const ctx = outputCanvas.getContext('2d');
+    const placeholder = document.getElementById('placeholder');
+
+    // UI Sliders Sync
+    document.getElementById('gridSize').oninput = (e) => document.getElementById('gridVal').innerText = e.target.value + 'px';
+    document.getElementById('jitter').oninput = (e) => document.getElementById('jitterVal').innerText = (e.target.value / 100).toFixed(1);
+    document.getElementById('radius').oninput = (e) => document.getElementById('radiusVal').innerText = parseFloat(e.target.value).toFixed(1);
+
+    imgInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            uploadLabel.innerText = "📄 " + file.name;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    loadedImage = img;
+                    convertBtn.disabled = false;
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    convertBtn.addEventListener('click', () => {
+        if (!loadedImage) return;
+
+        const grid = parseInt(document.getElementById('gridSize').value);
+        const jitterStr = parseFloat(document.getElementById('jitter').value) / 100.0;
+        const baseRadius = parseFloat(document.getElementById('radius').value);
+
+        const w = loadedImage.width;
+        const h = loadedImage.height;
+
+        outputCanvas.width = w;
+        outputCanvas.height = h;
+        outputCanvas.style.display = 'block';
+        placeholder.style.display = 'none';
+
+        // Draw temporary image to sample pixels
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(loadedImage, 0, 0);
+        const imgData = tempCtx.getImageData(0, 0, w, h).data;
+
+        // Render Background
+        ctx.fillStyle = '#050508';
+        ctx.fillRect(0, 0, w, h);
+
+        pointDataList = [];
+
+        for (let y = 0; y < h; y += grid) {
+            for (let x = 0; x < w; x += grid) {
+                // Apply jitter
+                let jx = x + (Math.random() * 2 - 1) * grid * jitterStr;
+                let jy = y + (Math.random() * 2 - 1) * grid * jitterStr;
+
+                let sx = Math.max(0, Math.min(w - 1, Math.floor(jx)));
+                let sy = Math.max(0, Math.min(h - 1, Math.floor(jy)));
+
+                let idx = (sy * w + sx) * 4;
+                let r = imgData[idx] / 255.0;
+                let g = imgData[idx + 1] / 255.0;
+                let b = imgData[idx + 2] / 255.0;
+
+                let lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                let rad = baseRadius * (1.4 - lum * 0.7) + (Math.random() - 0.5);
+                rad = Math.max(0.8, rad);
+
+                // Add to point dataset
+                pointDataList.push({
+                    x: sx,
+                    y: sy,
+                    norm_x: parseFloat((sx / w).toFixed(4)),
+                    norm_y: parseFloat(((h - sy) / h).toFixed(4)),
+                    r: parseFloat(r.toFixed(3)),
+                    g: parseFloat(g.toFixed(3)),
+                    b: parseFloat(b.toFixed(3)),
+                    radius: parseFloat(rad.toFixed(2))
+                });
+
+                // Draw circle
+                ctx.beginPath();
+                ctx.arc(sx, sy, rad, 0, Math.PI * 2);
+                ctx.fillStyle = `rgb(${Math.floor(r * 255)}, ${Math.floor(g * 255)}, ${Math.floor(b * 255)})`;
+                ctx.fill();
+            }
+        }
+
+        exportJson.disabled = false;
+        exportCsv.disabled = false;
+    });
+
+    // Export JSON
+    exportJson.addEventListener('click', () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(pointDataList, null, 2));
+        const dlAnchor = document.createElement('a');
+        dlAnchor.setAttribute("href", dataStr);
+        dlAnchor.setAttribute("download", "pointillism_data.json");
+        document.body.appendChild(dlAnchor);
+        dlAnchor.click();
+        dlAnchor.remove();
+    });
+
+    // Export CSV
+    exportCsv.addEventListener('click', () => {
+        let csvContent = "data:text/csv;charset=utf-8,x,y,norm_x,norm_y,r,g,b,radius\n";
+        pointDataList.forEach(p => {
+            csvContent += `${p.x},${p.y},${p.norm_x},${p.norm_y},${p.r},${p.g},${p.b},${p.radius}\n`;
+        });
+        const encodedUri = encodeURI(csvContent);
+        const dlAnchor = document.createElement('a');
+        dlAnchor.setAttribute("href", encodedUri);
+        dlAnchor.setAttribute("download", "pointillism_data.csv");
+        document.body.appendChild(dlAnchor);
+        dlAnchor.click();
+        dlAnchor.remove();
+    });
+</script>
+
+</body>
+</html>
